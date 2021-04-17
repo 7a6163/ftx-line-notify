@@ -7,6 +7,7 @@ from ciso8601 import parse_datetime
 import json
 import datetime
 import requests
+import telegram
 
 class FtxClient:
     _ENDPOINT = 'https://ftx.com/api/'
@@ -55,8 +56,8 @@ class FtxClient:
             if not data['success']:
                 raise Exception(data['error'])
             return data['result']
-        
-    
+
+
     def get_balances(self)->List[dict]:
         return self._get('wallet/balances')
 
@@ -71,16 +72,17 @@ class FtxClient:
 
 
 if __name__ == "__main__":
-    LINE_API_KEY = 'LINE_NOTIFY_API_KEY'
+    TELEGRAM_API_KEY = 'TELEGRAM_BOT_API_KEY'
+    TELEGRAM_CHAT_ID = 'TELEGRAM_CHAT_ID'
     subaccount = FtxClient('API_KEY','API_SECRET','SUBACCOUNT_NAME')
     coinlist = ['BTC-PERP','ETH-PERP'] #套利幣種
-    
+
     total = 0
     account = subaccount.get_account()
     balance = subaccount.get_balances()
     for coin in balance:
         total = total + coin['usdValue']
-    
+
     cost_24h = 0
     borrow_history = subaccount.get_borrow_history()
     for i in range(24):
@@ -91,7 +93,7 @@ if __name__ == "__main__":
         funding_payments = subaccount.get_funding_payments(future=coin)
         for i in range(24):
             payment_24h = payment_24h + funding_payments[i]['payment']
-    
+
     '''
     print ('昨日收益：' + str(round((-payment_24h-cost_24h),2)) +
     '\n當日年化：' + str(round(((-payment_24h-cost_24h)*365/total*100),2)) + '%' +
@@ -99,16 +101,14 @@ if __name__ == "__main__":
     '\n保證金：' + str(round((account['marginFraction']*100),2))+ '%' #lower than 3% will be liquidated
     )
     '''
-    
-    # Line Notify
-    headers = {
-        "Authorization": "Bearer " + LINE_API_KEY,
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    params = {"message": ' 期現套利'
+
+    bot = telegram.Bot(token=TELEGRAM_API_KEY)
+
+    params = {
+    "message": ' 期現套利'
     '\n昨日收益：' + str(round((-payment_24h-cost_24h),2)) +
     '\n當日年化：' + str(round(((-payment_24h-cost_24h)*365/total*100),2)) + '%' +
     '\n帳戶餘額：' + str(round(total,2)) +
     '\n保證金：' + str(round((account['marginFraction']*100),2))+ '%' }
-    r = requests.post("https://notify-api.line.me/api/notify",
-                        headers=headers, params=params)
+
+    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=params['message'])
